@@ -1,0 +1,13 @@
+package com.flightreservation.coordinator;
+
+public enum BookingStage {
+    INITIALIZED,
+    STEP_A_SEAT_HELD,
+    STEP_B_TICKET_ISSUED,
+    COMPLETED,
+    COMPENSATING_AFTER_B_FAILURE,
+    COMPENSATING_AFTER_C_FAILURE,
+    COMPENSATED_A_ONLY,
+    COMPENSATED_FULL,
+    FAILED_INITIALIZATION
+}
