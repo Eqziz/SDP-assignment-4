@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="100%" height="100%" style="background:#ffffff;font-family:Arial,sans-serif;">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d3748" />
+    </marker>
+  </defs>
+
+  <rect x="10" y="10" width="1180" height="60" rx="8" fill="#1a365d" />
+  <text x="600" y="45" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">Flight Reservation Architecture: Facade Over Three Subsystems with Persistence</text>
+
+  <!-- Client Layer -->
+  <rect x="420" y="90" width="360" height="70" rx="6" fill="#ebf8ff" stroke="#3182ce" stroke-width="2" />
+  <text x="600" y="115" font-size="14" font-weight="bold" fill="#2b6cb0" text-anchor="middle">Client: FlightReservationApp (CLI)</text>
+  <text x="600" y="140" font-size="12" fill="#4a5568" text-anchor="middle">+runInteractiveLoop() | drives chain, inspection, &amp; rollback</text>
+
+  <!-- Arrows from Client to Facades -->
+  <line x1="530" y1="160" x2="330" y2="210" stroke="#2d3748" stroke-width="2" marker-end="url(#arrow)" />
+  <line x1="670" y1="160" x2="870" y2="210" stroke="#2d3748" stroke-width="2" marker-end="url(#arrow)" />
+
+  <!-- Facade Layer -->
+  <rect x="50" y="210" width="520" height="150" rx="6" fill="#f0fff4" stroke="#38a169" stroke-width="2" />
+  <text x="310" y="235" font-size="15" font-weight="bold" fill="#276749" text-anchor="middle">Facade 1: FlightBookingFacade (Client Workflow)</text>
+  <line x1="50" y1="245" x2="570" y2="245" stroke="#38a169" stroke-width="1" />
+  <text x="70" y="270" font-size="12" fill="#2d3748">+bookFlight(request: BookingRequest): BookingResult</text>
+  <text x="70" y="295" font-size="12" fill="#2d3748">• Orchestrates: Step A (Hold) -&gt; Step B (Issue) -&gt; Step C (Confirm)</text>
+  <text x="70" y="320" font-size="12" fill="#c53030">• B-Failure Rollback: Compensates Subsystem A alone (HELD -&gt; RELEASED)</text>
+  <text x="70" y="345" font-size="12" fill="#c53030">• C-Failure Rollback: Compensates B (VOIDED), then A (RELEASED)</text>
+
+  <rect x="630" y="210" width="520" height="150" rx="6" fill="#fefcbf" stroke="#d69e2e" stroke-width="2" />
+  <text x="890" y="235" font-size="15" font-weight="bold" fill="#b7791f" text-anchor="middle">Facade 2: FlightOperationsFacade (Admin / Recovery)</text>
+  <line x1="630" y1="245" x2="1150" y2="245" stroke="#d69e2e" stroke-width="1" />
+  <text x="650" y="270" font-size="12" fill="#2d3748">+inspectBooking(bookingReference): ReservationInspection</text>
+  <text x="650" y="295" font-size="12" fill="#2d3748">+reconcilePendingTransactions(): int (Post-restart disk recovery)</text>
+  <text x="650" y="320" font-size="12" fill="#2d3748">+manualRollback(bookingReference): boolean</text>
+  <text x="650" y="345" font-size="12" fill="#2d3748">+resetAllStores(): void | listAllTransactions(): List</text>
+
+  <!-- Arrows from Facades to Coordinator -->
+  <line x1="310" y1="360" x2="520" y2="400" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow)" />
+  <line x1="890" y1="360" x2="680" y2="400" stroke="#4a5568" stroke-width="1.5" marker-end="url(#arrow)" />
+
+  <!-- Coordinator Box -->
+  <rect x="420" y="395" width="360" height="85" rx="6" fill="#edf2f7" stroke="#4a5568" stroke-width="2" />
+  <text x="600" y="418" font-size="14" font-weight="bold" fill="#2d3748" text-anchor="middle">Coordinator: BookingJournalRepository</text>
+  <line x1="420" y1="426" x2="780" y2="426" stroke="#4a5568" stroke-width="1" />
+  <text x="435" y="446" font-size="11" fill="#4a5568">Stores: BookingTransaction (booking_journal.json)</text>
+  <text x="435" y="466" font-size="11" fill="#4a5568">Stages: HELD | ISSUED | COMPLETED | COMPENSATED</text>
+
+  <!-- Subsystems Heading -->
+  <text x="600" y="515" font-size="16" font-weight="bold" fill="#1a202c" text-anchor="middle">Three Independent Subsystems (Zero Cross-Subsystem Coupling)</text>
+
+  <!-- Subsystem A -->
+  <rect x="30" y="535" width="360" height="320" rx="6" fill="#ffffff" stroke="#3182ce" stroke-width="2" />
+  <rect x="30" y="535" width="360" height="35" rx="6" fill="#3182ce" />
+  <text x="210" y="558" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Subsystem A: Seat Reservation</text>
+  <text x="45" y="595" font-size="12" font-weight="bold" fill="#2b6cb0">• Entity: SeatReservation</text>
+  <text x="60" y="615" font-size="11" fill="#4a5568">State: HELD -&gt; CONFIRMED -&gt; RELEASED</text>
+  <text x="60" y="635" font-size="11" fill="#4a5568">Self-enforced transitions</text>
+  <text x="45" y="665" font-size="12" font-weight="bold" fill="#2b6cb0">• Business Logic: FareCalculator</text>
+  <text x="60" y="685" font-size="11" fill="#4a5568">Cabin classes, exit row surcharges, taxes</text>
+  <text x="45" y="715" font-size="12" font-weight="bold" fill="#2b6cb0">• Business Logic: SeatMapValidator</text>
+  <text x="60" y="735" font-size="11" fill="#4a5568">Format (1-35, A-F) &amp; conflict checks</text>
+  <text x="45" y="765" font-size="12" font-weight="bold" fill="#2b6cb0">• Gateway: SeatReservationRepository</text>
+  <text x="60" y="785" font-size="11" fill="#4a5568">Direct file store: seat_reservations.json</text>
+  <text x="45" y="815" font-size="11" font-weight="bold" fill="#c53030">Realistic Failure: Seat unavailable (pre-commit)</text>
+  <text x="45" y="835" font-size="11" font-weight="bold" fill="#276749">Compensation: HELD -&gt; RELEASED</text>
+
+  <!-- Subsystem B -->
+  <rect x="420" y="535" width="360" height="320" rx="6" fill="#ffffff" stroke="#805ad5" stroke-width="2" />
+  <rect x="420" y="535" width="360" height="35" rx="6" fill="#805ad5" />
+  <text x="600" y="558" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Subsystem B: Ticket &amp; Baggage</text>
+  <text x="435" y="595" font-size="12" font-weight="bold" fill="#6b46c1">• Entity: TicketIssuance</text>
+  <text x="450" y="615" font-size="11" fill="#4a5568">State: ISSUED -&gt; COMPLETED -&gt; VOIDED</text>
+  <text x="450" y="635" font-size="11" fill="#4a5568">Self-enforced transitions</text>
+  <text x="435" y="665" font-size="12" font-weight="bold" fill="#6b46c1">• Business Logic: BaggageRulesEngine</text>
+  <text x="450" y="685" font-size="11" fill="#4a5568">20kg free allowance, $15/kg excess</text>
+  <text x="450" y="705" font-size="11" fill="#c53030">Hard limit: 32kg max -&gt; ExcessBaggageEx</text>
+  <text x="435" y="735" font-size="12" font-weight="bold" fill="#6b46c1">• Business Logic: TicketNumberGenerator</text>
+  <text x="450" y="755" font-size="11" fill="#4a5568">IATA formatted ETKT-2026-XXXXXX</text>
+  <text x="435" y="785" font-size="12" font-weight="bold" fill="#6b46c1">• Gateway: TicketIssuanceRepository</text>
+  <text x="450" y="805" font-size="11" fill="#4a5568">Direct file store: ticket_issuances.json</text>
+  <text x="435" y="835" font-size="11" font-weight="bold" fill="#276749">Compensation: ISSUED -&gt; VOIDED</text>
+
+  <!-- Subsystem C -->
+  <rect x="810" y="535" width="360" height="320" rx="6" fill="#ffffff" stroke="#dd6b20" stroke-width="2" />
+  <rect x="810" y="535" width="360" height="35" rx="6" fill="#dd6b20" />
+  <text x="990" y="558" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Subsystem C: Loyalty &amp; Finalization</text>
+  <text x="825" y="595" font-size="12" font-weight="bold" fill="#c05621">• Entity: LoyaltyAccountRecord</text>
+  <text x="840" y="615" font-size="11" fill="#4a5568">State: ACCRUED -&gt; SETTLED -&gt; REVOKED</text>
+  <text x="840" y="635" font-size="11" fill="#4a5568">Self-enforced transitions</text>
+  <text x="825" y="665" font-size="12" font-weight="bold" fill="#c05621">• Business Logic: LoyaltyPointsCalculator</text>
+  <text x="840" y="685" font-size="11" fill="#4a5568">Tier multipliers: STANDARD, SILVER, GOLD, PLATINUM</text>
+  <text x="825" y="715" font-size="12" font-weight="bold" fill="#c05621">• Business Logic: MealPreferenceValidator</text>
+  <text x="840" y="735" font-size="11" fill="#4a5568">Validates catering policy (VEGAN, KOSHER...)</text>
+  <text x="840" y="755" font-size="11" fill="#c53030">Hard check: Suspended/Restricted account check</text>
+  <text x="825" y="785" font-size="12" font-weight="bold" fill="#c05621">• Gateway: LoyaltyRecordRepository</text>
+  <text x="840" y="805" font-size="11" fill="#4a5568">Direct file store: loyalty_records.json</text>
+  <text x="825" y="835" font-size="11" font-weight="bold" fill="#276749">Compensation: ACCRUED/SETTLED -&gt; REVOKED</text>
+
+  <!-- Connectors from Facade to Subsystems -->
+  <line x1="210" y1="360" x2="210" y2="535" stroke="#3182ce" stroke-width="2" stroke-dasharray="4" marker-end="url(#arrow)" />
+  <line x1="310" y1="360" x2="600" y2="535" stroke="#805ad5" stroke-width="2" stroke-dasharray="4" marker-end="url(#arrow)" />
+  <line x1="410" y1="360" x2="990" y2="535" stroke="#dd6b20" stroke-width="2" stroke-dasharray="4" marker-end="url(#arrow)" />
+
+</svg>

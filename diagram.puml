@@ -1,0 +1,255 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam packageStyle rectangle
+
+package "Client Layer" {
+    class FlightReservationApp {
+        +main(args: String[])
+        +runInteractiveLoop(): void
+    }
+}
+
+package "Facade Layer" {
+    class FlightBookingFacade {
+        -seatRepository: SeatReservationRepository
+        -fareCalculator: FareCalculator
+        -seatMapValidator: SeatMapValidator
+        -ticketRepository: TicketIssuanceRepository
+        -baggageRulesEngine: BaggageRulesEngine
+        -ticketGenerator: TicketNumberGenerator
+        -loyaltyRepository: LoyaltyRecordRepository
+        -pointsCalculator: LoyaltyPointsCalculator
+        -mealValidator: MealPreferenceValidator
+        -journalRepository: BookingJournalRepository
+        +bookFlight(request: BookingRequest): BookingResult
+    }
+
+    class FlightOperationsFacade {
+        -seatRepository: SeatReservationRepository
+        -ticketRepository: TicketIssuanceRepository
+        -loyaltyRepository: LoyaltyRecordRepository
+        -journalRepository: BookingJournalRepository
+        +inspectBooking(ref: String): ReservationInspection
+        +reconcilePendingTransactions(): int
+        +manualRollback(ref: String): boolean
+        +listAllTransactions(): List<BookingTransaction>
+        +resetAllStores(): void
+    }
+
+    class BookingRequest {
+        -flightNumber: String
+        -passengerId: String
+        -passengerName: String
+        -seatNumber: String
+        -seatClass: String
+        -baggageWeightKg: double
+        -memberId: String
+        -membershipTier: String
+        -mealPreference: String
+    }
+
+    class BookingResult {
+        -success: boolean
+        -bookingReference: String
+        -finalStage: BookingStage
+        -failureReason: String
+        -compensatedSteps: List<String>
+    }
+
+    class ReservationInspection {
+        -bookingReference: String
+        -consistent: boolean
+        -summary: String
+    }
+}
+
+package "Coordinator & Journal (Durable State)" {
+    class BookingJournalRepository {
+        -filePath: Path
+        +save(tx: BookingTransaction): void
+        +update(tx: BookingTransaction): void
+        +findByReference(ref: String): Optional<BookingTransaction>
+        +findUnresolvedTransactions(): List<BookingTransaction>
+        +findAll(): List<BookingTransaction>
+        +reload(): void
+        +clear(): void
+    }
+
+    class BookingTransaction {
+        -bookingReference: String
+        -flightNumber: String
+        -passengerId: String
+        -passengerName: String
+        -seatNumber: String
+        -seatReservationId: String
+        -ticketNumber: String
+        -confirmationCode: String
+        -stage: BookingStage
+        -failureReason: String
+        +advanceStage(nextStage: BookingStage): void
+        +recordFailure(stage: BookingStage, reason: String): void
+    }
+
+    enum BookingStage {
+        INITIALIZED
+        STEP_A_SEAT_HELD
+        STEP_B_TICKET_ISSUED
+        COMPLETED
+        COMPENSATING_AFTER_B_FAILURE
+        COMPENSATING_AFTER_C_FAILURE
+        COMPENSATED_A_ONLY
+        COMPENSATED_FULL
+        FAILED_INITIALIZATION
+    }
+}
+
+package "Subsystem A: Seat Reservation" {
+    class SeatReservationRepository {
+        -filePath: Path
+        +save(r: SeatReservation): void
+        +update(r: SeatReservation): void
+        +findById(id: String): Optional<SeatReservation>
+        +findActiveByFlightAndSeat(flight: String, seat: String): Optional<SeatReservation>
+        +findAll(): List<SeatReservation>
+        +reload(): void
+        +clear(): void
+    }
+
+    class SeatReservation {
+        -reservationId: String
+        -flightNumber: String
+        -passengerId: String
+        -seatNumber: String
+        -seatClass: String
+        -fare: double
+        -status: SeatReservationStatus
+        +transitionTo(newStatus: SeatReservationStatus): void
+    }
+
+    enum SeatReservationStatus {
+        HELD
+        CONFIRMED
+        RELEASED
+    }
+
+    class FareCalculator {
+        +calculateFare(seatClass: String, seatNumber: String): double
+    }
+
+    class SeatMapValidator {
+        +validateSeatFormat(seatNumber: String): void
+        +ensureSeatAvailable(flight: String, seat: String, repo: SeatReservationRepository): void
+    }
+}
+
+package "Subsystem B: Ticket Issuance & Baggage" {
+    class TicketIssuanceRepository {
+        -filePath: Path
+        +save(t: TicketIssuance): void
+        +update(t: TicketIssuance): void
+        +findById(ticketNumber: String): Optional<TicketIssuance>
+        +findByBookingReference(ref: String): Optional<TicketIssuance>
+        +findAll(): List<TicketIssuance>
+        +reload(): void
+        +clear(): void
+    }
+
+    class TicketIssuance {
+        -ticketNumber: String
+        -bookingReference: String
+        -passengerName: String
+        -flightNumber: String
+        -baggageWeightKg: double
+        -excessBaggageFee: double
+        -status: TicketStatus
+        +transitionTo(newStatus: TicketStatus): void
+    }
+
+    enum TicketStatus {
+        ISSUED
+        COMPLETED
+        VOIDED
+    }
+
+    class BaggageRulesEngine {
+        +validateAndCalculateFee(weightKg: double): double
+    }
+
+    class TicketNumberGenerator {
+        +generateTicketNumber(): String
+        +isValidTicketNumber(ticketNumber: String): boolean
+    }
+}
+
+package "Subsystem C: Loyalty & Confirmation" {
+    class LoyaltyRecordRepository {
+        -filePath: Path
+        +save(r: LoyaltyAccountRecord): void
+        +update(r: LoyaltyAccountRecord): void
+        +findById(code: String): Optional<LoyaltyAccountRecord>
+        +findByBookingReference(ref: String): Optional<LoyaltyAccountRecord>
+        +findAll(): List<LoyaltyAccountRecord>
+        +reload(): void
+        +clear(): void
+    }
+
+    class LoyaltyAccountRecord {
+        -confirmationCode: String
+        -bookingReference: String
+        -memberId: String
+        -membershipTier: String
+        -pointsAccrued: int
+        -mealPreference: String
+        -totalPaid: double
+        -status: LoyaltyStatus
+        +transitionTo(newStatus: LoyaltyStatus): void
+    }
+
+    enum LoyaltyStatus {
+        ACCRUED
+        SETTLED
+        REVOKED
+    }
+
+    class LoyaltyPointsCalculator {
+        +calculatePoints(totalPaid: double, tier: String): int
+    }
+
+    class MealPreferenceValidator {
+        +validate(mealPreference: String, memberId: String): String
+    }
+}
+
+FlightReservationApp --> FlightBookingFacade
+FlightReservationApp --> FlightOperationsFacade
+
+FlightBookingFacade --> SeatReservationRepository
+FlightBookingFacade --> FareCalculator
+FlightBookingFacade --> SeatMapValidator
+FlightBookingFacade --> TicketIssuanceRepository
+FlightBookingFacade --> BaggageRulesEngine
+FlightBookingFacade --> TicketNumberGenerator
+FlightBookingFacade --> LoyaltyRecordRepository
+FlightBookingFacade --> LoyaltyPointsCalculator
+FlightBookingFacade --> MealPreferenceValidator
+FlightBookingFacade --> BookingJournalRepository
+
+FlightOperationsFacade --> SeatReservationRepository
+FlightOperationsFacade --> TicketIssuanceRepository
+FlightOperationsFacade --> LoyaltyRecordRepository
+FlightOperationsFacade --> BookingJournalRepository
+
+BookingJournalRepository o-- BookingTransaction
+BookingTransaction --> BookingStage
+
+SeatReservationRepository o-- SeatReservation
+SeatReservation --> SeatReservationStatus
+
+TicketIssuanceRepository o-- TicketIssuance
+TicketIssuance --> TicketStatus
+
+LoyaltyRecordRepository o-- LoyaltyAccountRecord
+LoyaltyAccountRecord --> LoyaltyStatus
+
+@enduml
