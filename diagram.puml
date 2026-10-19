@@ -62,6 +62,16 @@ package "Facade Layer" {
         -consistent: boolean
         -summary: String
     }
+
+    class BookingCompensationHandler {
+        -seatRepository: SeatReservationRepository
+        -ticketRepository: TicketIssuanceRepository
+        -journalRepository: BookingJournalRepository
+        +compensateStepBFailure(tx: BookingTransaction, seat: SeatReservation, reason: String): BookingResult
+        +compensateStepCFailure(tx: BookingTransaction, seat: SeatReservation, ticket: TicketIssuance, reason: String): BookingResult
+        +releaseSeat(seat: SeatReservation): void
+        +voidTicket(ticket: TicketIssuance): void
+    }
 }
 
 package "Coordinator & Journal (Durable State)" {
@@ -239,6 +249,12 @@ FlightOperationsFacade --> SeatReservationRepository
 FlightOperationsFacade --> TicketIssuanceRepository
 FlightOperationsFacade --> LoyaltyRecordRepository
 FlightOperationsFacade --> BookingJournalRepository
+
+FlightBookingFacade --> BookingCompensationHandler
+FlightOperationsFacade --> BookingCompensationHandler
+BookingCompensationHandler --> SeatReservationRepository
+BookingCompensationHandler --> TicketIssuanceRepository
+BookingCompensationHandler --> BookingJournalRepository
 
 BookingJournalRepository o-- BookingTransaction
 BookingTransaction --> BookingStage

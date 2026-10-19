@@ -23,16 +23,32 @@ public class FlightOperationsFacade {
     private final TicketIssuanceRepository ticketRepository;
     private final LoyaltyRecordRepository loyaltyRepository;
     private final BookingJournalRepository journalRepository;
+    private final BookingCompensationHandler compensationHandler;
 
     public FlightOperationsFacade(
             SeatReservationRepository seatRepository,
             TicketIssuanceRepository ticketRepository,
             LoyaltyRecordRepository loyaltyRepository,
             BookingJournalRepository journalRepository) {
+        this(
+                seatRepository,
+                ticketRepository,
+                loyaltyRepository,
+                journalRepository,
+                new BookingCompensationHandler(seatRepository, ticketRepository, journalRepository));
+    }
+
+    public FlightOperationsFacade(
+            SeatReservationRepository seatRepository,
+            TicketIssuanceRepository ticketRepository,
+            LoyaltyRecordRepository loyaltyRepository,
+            BookingJournalRepository journalRepository,
+            BookingCompensationHandler compensationHandler) {
         this.seatRepository = Objects.requireNonNull(seatRepository, "seatRepository cannot be null");
         this.ticketRepository = Objects.requireNonNull(ticketRepository, "ticketRepository cannot be null");
         this.loyaltyRepository = Objects.requireNonNull(loyaltyRepository, "loyaltyRepository cannot be null");
         this.journalRepository = Objects.requireNonNull(journalRepository, "journalRepository cannot be null");
+        this.compensationHandler = Objects.requireNonNull(compensationHandler, "compensationHandler cannot be null");
     }
 
     public ReservationInspection inspectBooking(String bookingReference) {
@@ -119,37 +135,19 @@ public class FlightOperationsFacade {
             BookingStage stage = tx.getStage();
             if (stage == BookingStage.STEP_A_SEAT_HELD || stage == BookingStage.COMPENSATING_AFTER_B_FAILURE) {
                 if (tx.getSeatReservationId() != null) {
-                    Optional<SeatReservation> seatOpt = seatRepository.findById(tx.getSeatReservationId());
-                    if (seatOpt.isPresent()) {
-                        SeatReservation seat = seatOpt.get();
-                        if (seat.getStatus() == SeatReservationStatus.HELD) {
-                            seat.transitionTo(SeatReservationStatus.RELEASED);
-                            seatRepository.update(seat);
-                        }
-                    }
+                    seatRepository.findById(tx.getSeatReservationId())
+                            .ifPresent(compensationHandler::releaseSeat);
                 }
                 tx.advanceStage(BookingStage.COMPENSATED_A_ONLY);
                 journalRepository.update(tx);
                 reconciledCount++;
             } else if (stage == BookingStage.STEP_B_TICKET_ISSUED || stage == BookingStage.COMPENSATING_AFTER_C_FAILURE) {
-                Optional<TicketIssuance> ticketOpt = ticketRepository.findByBookingReference(tx.getBookingReference());
-                if (ticketOpt.isPresent()) {
-                    TicketIssuance ticket = ticketOpt.get();
-                    if (ticket.getStatus() == TicketStatus.ISSUED) {
-                        ticket.transitionTo(TicketStatus.VOIDED);
-                        ticketRepository.update(ticket);
-                    }
-                }
+                ticketRepository.findByBookingReference(tx.getBookingReference())
+                        .ifPresent(compensationHandler::voidTicket);
 
                 if (tx.getSeatReservationId() != null) {
-                    Optional<SeatReservation> seatOpt = seatRepository.findById(tx.getSeatReservationId());
-                    if (seatOpt.isPresent()) {
-                        SeatReservation seat = seatOpt.get();
-                        if (seat.getStatus() == SeatReservationStatus.HELD) {
-                            seat.transitionTo(SeatReservationStatus.RELEASED);
-                            seatRepository.update(seat);
-                        }
-                    }
+                    seatRepository.findById(tx.getSeatReservationId())
+                            .ifPresent(compensationHandler::releaseSeat);
                 }
                 tx.advanceStage(BookingStage.COMPENSATED_FULL);
                 journalRepository.update(tx);
@@ -178,24 +176,12 @@ public class FlightOperationsFacade {
             }
         }
 
-        Optional<TicketIssuance> ticketOpt = ticketRepository.findByBookingReference(bookingReference);
-        if (ticketOpt.isPresent()) {
-            TicketIssuance ticket = ticketOpt.get();
-            if (ticket.getStatus() != TicketStatus.VOIDED) {
-                ticket.transitionTo(TicketStatus.VOIDED);
-                ticketRepository.update(ticket);
-            }
-        }
+        ticketRepository.findByBookingReference(bookingReference)
+                .ifPresent(compensationHandler::voidTicket);
 
         if (tx.getSeatReservationId() != null) {
-            Optional<SeatReservation> seatOpt = seatRepository.findById(tx.getSeatReservationId());
-            if (seatOpt.isPresent()) {
-                SeatReservation seat = seatOpt.get();
-                if (seat.getStatus() != SeatReservationStatus.RELEASED) {
-                    seat.transitionTo(SeatReservationStatus.RELEASED);
-                    seatRepository.update(seat);
-                }
-            }
+            seatRepository.findById(tx.getSeatReservationId())
+                    .ifPresent(compensationHandler::releaseSeat);
         }
 
         tx.recordFailure(BookingStage.COMPENSATED_FULL, "Manual administrative rollback invoked");
